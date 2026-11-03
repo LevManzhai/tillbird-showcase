@@ -1,0 +1,27 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+instance/
+data/
+*.db
+*.sqlite*
+
+# Client store configs (only the example is tracked)
+stores/*
+!stores/demo-example.yaml
+!stores/demo-example.products.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

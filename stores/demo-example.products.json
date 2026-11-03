@@ -1,0 +1,37 @@
+[
+  {
+    "title": "Classic Wool Overcoat",
+    "variants": [
+      {"title": "UK 8", "price": "189.00", "available": true},
+      {"title": "UK 10", "price": "189.00", "available": true},
+      {"title": "UK 12", "price": "189.00", "available": true},
+      {"title": "UK 14", "price": "189.00", "available": true},
+      {"title": "UK 16", "price": "199.00", "available": true}
+    ],
+    "url": "https://example-fashion.co.uk/products/classic-wool-overcoat",
+    "description": "Knee-length tailored overcoat in 80% wool, 20% nylon. Falls to mid-calf on our UK 12 model (5'8\"). Dry clean only. UK 16 uses more fabric and costs slightly more."
+  },
+  {
+    "title": "Merino Crew Jumper",
+    "variants": [
+      {"title": "XS", "price": "65.00", "available": true},
+      {"title": "S", "price": "65.00", "available": true},
+      {"title": "M", "price": "65.00", "available": true},
+      {"title": "L", "price": "65.00", "available": true},
+      {"title": "XL", "price": "65.00", "available": true}
+    ],
+    "url": "https://example-fashion.co.uk/products/merino-crew-jumper",
+    "description": "100% merino wool crew-neck jumper, regular fit. Machine washable on wool cycle."
+  },
+  {
+    "title": "Tailored Wide-Leg Trousers",
+    "variants": [
+      {"title": "UK 8", "price": "79.00", "available": false},
+      {"title": "UK 10", "price": "79.00", "available": false},
+      {"title": "UK 12", "price": "79.00", "available": false},
+      {"title": "UK 14", "price": "79.00", "available": false}
+    ],
+    "url": "https://example-fashion.co.uk/products/tailored-wide-leg-trousers",
+    "description": "High-waisted wide-leg trousers, 98% cotton 2% elastane. Inside leg 31\" on a UK 12."
+  }
+]

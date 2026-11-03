@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{{ store.store_name }} — chat demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 48px 20px;
+      background: #fafafa;
+      color: #1a1a1a;
+    }
+    .wrap { max-width: 560px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    p { line-height: 1.6; color: #444; }
+    .badge {
+      display: inline-block;
+      background: {{ store.brand_color }};
+      color: #fff;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .unofficial-notice {
+      background: #fff8e6;
+      border: 1px solid #f0dca0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #6b5a1e;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <span class="badge">{{ 'Live' if store.mode == 'live' else 'Demo' }} store</span>
+    <h1>{{ store.store_name }}</h1>
+    {% if store.mode == 'demo' %}
+    <p class="unofficial-notice">
+      Unofficial demo built by Tillbird using this store's public information.
+      {{ store.store_name }} has not endorsed or approved this — it's a sample
+      of how an AI support assistant could work on their site.
+    </p>
+    {% endif %}
+    <p>
+      This page shows the AI support widget exactly as it would appear on
+      {{ store.store_name }}'s own site — same script, same config, loaded
+      from this server. Click the round button in the bottom-right corner to
+      start a conversation.
+    </p>
+    <p>Try asking about an order, shipping, returns, or sizing.</p>
+  </div>
+  <script src="/widget.js" data-store="{{ store.store_id }}" defer></script>
+</body>
+</html>

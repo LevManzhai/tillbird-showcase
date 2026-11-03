@@ -1,0 +1,41 @@
+store_id: demo-example
+store_name: Example Fashion Co.
+shop_domain: example-fashion.myshopify.com
+public_domain: example-fashion.co.uk
+admin_token_env: SHOPIFY_ADMIN_TOKEN_DEMO_EXAMPLE
+support_email: support@example-fashion.co.uk
+tone: Warm, concise and a little witty. Never pushy.
+brand_color: "#1a1a2e"
+greeting: Hi! How can I help you today?
+hint_text: Questions about your order? Ask me anything.
+allowed_origins:
+  - https://example-fashion.co.uk
+  - https://www.example-fashion.co.uk
+
+knowledge_base:
+  shipping: >
+    We ship across the UK via Royal Mail (2-3 working days) and Evri (3-5 working days).
+    Free standard shipping on orders over £50. Express DPD next-day delivery available at checkout.
+  returns: >
+    Returns accepted within 30 days of delivery, unworn and with tags attached.
+    Use the prepaid returns label included in your parcel. Refunds are issued to the
+    original payment method within 5-7 working days of us receiving the item.
+  sizing: >
+    Our fit runs true to size. See the size guide linked on each product page for
+    UK/EU/US conversions and garment measurements.
+  faq:
+    - question: Do you ship to Ireland?
+      answer: >
+        Yes, we ship to Ireland via Evri (5-7 working days). Note that Irish customers
+        may be liable for import duties and VAT on delivery.
+    - question: How do I track my order?
+      answer: >
+        You'll receive a tracking link by email once your order ships. You can also ask
+        me for an order status update if you give me your order number and email.
+
+forbidden:
+  - Never promise a specific refund amount or approve a refund directly.
+  - Never offer a discount code or promise compensation.
+  - Never confirm or deny stock levels beyond what search_products returns.
+
+mode: demo

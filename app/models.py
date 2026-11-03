@@ -1,0 +1,211 @@
+from datetime import datetime, timezone
+
+from app.extensions import db
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class Session(db.Model):
+    __tablename__ = "sessions"
+
+    id = db.Column(db.String(64), primary_key=True)
+    store_id = db.Column(db.String(64), nullable=False, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False)
+    last_active_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    messages = db.relationship("Message", backref="session", cascade="all, delete-orphan")
+
+
+class Message(db.Model):
+    __tablename__ = "messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(64), db.ForeignKey("sessions.id"), nullable=False, index=True)
+    role = db.Column(db.String(16), nullable=False)  # "user" | "assistant"
+    content = db.Column(db.Text, nullable=False)
+    ip_address = db.Column(db.String(64), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+    # Anthropic usage for the turn that produced this message — only ever
+    # set on an "assistant" row (a "user" row costs no tokens on its own);
+    # summed across every messages.create() call the turn made (see
+    # app.agent.loop.TurnUsage). Added after this table already existed in
+    # production — see app.db_init.add_missing_columns_safely, the
+    # idempotent migration that adds these to an existing database.
+    input_tokens = db.Column(db.Integer, nullable=True)
+    output_tokens = db.Column(db.Integer, nullable=True)
+    cache_creation_input_tokens = db.Column(db.Integer, nullable=True)
+    cache_read_input_tokens = db.Column(db.Integer, nullable=True)
+
+
+class ToolCall(db.Model):
+    __tablename__ = "tool_calls"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(64), db.ForeignKey("sessions.id"), nullable=False, index=True)
+    name = db.Column(db.String(64), nullable=False)
+    args = db.Column(db.Text, nullable=False)  # JSON, sensitive fields masked
+    status = db.Column(db.String(32), nullable=False)
+    ip_address = db.Column(db.String(64), nullable=True, index=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+
+
+class Handoff(db.Model):
+    __tablename__ = "handoffs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(64), db.ForeignKey("sessions.id"), nullable=False, index=True)
+    # Unlike ToolCall.args, this is operational data a human needs to actually
+    # reply to the customer — intentionally not masked. Restrict DB access
+    # accordingly in a real deployment.
+    customer_email = db.Column(db.String(255), nullable=False)
+    summary = db.Column(db.Text, nullable=False)
+    email_sent = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+
+
+class SentNotification(db.Model):
+    """Idempotency marker for a one-off internal (me, never the shop
+    owner) notification email that must never be sent twice for the same
+    (store, kind, period) — e.g. a monthly usage-threshold alert
+    (kind="usage_80"/"usage_100", period="2026-10", see app.usage_limits)
+    or a trial-ended notice (kind="trial_ended", period=the trial's end
+    date, see app.store_status). A row's mere existence IS the "already
+    sent" marker; nothing else ever reads this table. A brand-new table
+    (not an ALTER on an existing one), so no migration needed —
+    db.create_all() creates it on the next deploy.
+    """
+
+    __tablename__ = "sent_notifications"
+    __table_args__ = (db.UniqueConstraint("store_id", "kind", "period", name="uq_sent_notifications_store_kind_period"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    store_id = db.Column(db.String(64), nullable=False, index=True)
+    kind = db.Column(db.String(32), nullable=False)
+    period = db.Column(db.String(32), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False)
+
+
+class Lead(db.Model):
+    """A "get a free demo" form submission from the marketing site (see
+    app/routes/leads.py) — not tied to any store_id, since it's how someone
+    becomes a store in the first place.
+    """
+
+    __tablename__ = "leads"
+
+    id = db.Column(db.Integer, primary_key=True)
+    store_url = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(255), nullable=True)
+    ip_address = db.Column(db.String(64), nullable=True, index=True)
+    email_sent = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+
+
+class AuditReport(db.Model):
+    """A "Customer Questions Audit" report (see app/audit.py) — generated by
+    scripts/audit_store.py, served at /audit/<slug> (app/routes/audit.py).
+
+    Created as status "draft" and never served publicly until a human
+    approves it (scripts/approve_audit.py sets status to "approved") — this
+    is outreach collateral sent directly to a prospect quoting facts about
+    their own store, so a human reviews it before anyone outside Tillbird
+    can see it. `report` is the full structured result from
+    app.audit.run_audit() (questions, findings, counts, evidence, etc.),
+    serialized as JSON — kept as one blob rather than normalised into
+    columns/tables since it's read as a whole by the report template and
+    never queried piecemeal.
+    """
+
+    __tablename__ = "audit_reports"
+
+    slug = db.Column(db.String(64), primary_key=True)
+    store_url = db.Column(db.String(255), nullable=False)
+    store_name = db.Column(db.String(255), nullable=False)
+    demo_url = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(16), nullable=False, default="draft")  # "draft" | "approved"
+    report_json = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+
+
+class OAuthState(db.Model):
+    """A short-lived CSRF nonce for one in-progress /oauth/install ->
+    /oauth/callback round trip (see app/routes/oauth.py) — not a
+    cookie, so it survives even if the client's browser doesn't carry
+    cookies through the Shopify-hosted consent screen. Deleted once
+    consumed (or expired) by the callback; app.config.AppConfig's
+    oauth_state_expiry_minutes controls how long one is valid for.
+
+    No `plan` column here — a custom-distribution app only installs on
+    the ONE store it was generated for (see ShopifyAppCredential below),
+    so plan is looked up from that same per-client row at callback time
+    rather than carried through the state/query string.
+    """
+
+    __tablename__ = "oauth_states"
+
+    state = db.Column(db.String(64), primary_key=True)
+    shop_domain = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+
+
+class ShopifyAppCredential(db.Model):
+    """One client's Shopify app (client_id + encrypted client_secret) —
+    see scripts/add_client_app.py.
+
+    A custom-distribution app can only be installed on the ONE store (or
+    one Plus organization) it was generated for — unlike the token model
+    below, this isn't shared infrastructure, it's a SEPARATE app per
+    client, each created by hand in the Partner Dashboard. `client_id` is
+    not secret (it appears in the install URL itself) and is stored
+    plain; `client_secret` is encrypted at rest the same way OAuth tokens
+    are (app.credential_encryption) since it signs every OAuth/webhook
+    request for this client and must never be logged or printed — see
+    scripts/add_client_app.py's use of getpass.
+    """
+
+    __tablename__ = "shopify_app_credentials"
+
+    store_id = db.Column(db.String(64), primary_key=True)
+    shop_domain = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    client_id = db.Column(db.String(255), nullable=False)
+    encrypted_client_secret = db.Column(db.LargeBinary, nullable=False)
+    plan = db.Column(db.String(16), nullable=True)  # "starter" | "growth" — set once, at scripts/add_client_app.py time
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False)
+
+
+class ShopifyOAuthCredential(db.Model):
+    """One client store's OAuth tokens (authorization code grant — see
+    docs/OAUTH_PLAN.md and app/shopify_oauth.py), encrypted at rest
+    (app.credential_encryption) — never store or log the plaintext
+    token anywhere else.
+
+    Unlike admin_token_env/client_id_env (StoreConfig's static-secret
+    patterns, which point at env vars set once by hand), this is dynamic,
+    per-store, rotating data: the access token expires roughly every 60
+    minutes and must be refreshed using the refresh token, which itself
+    expires after ~90 days — that belongs in the database, not a YAML
+    file or .env, and must survive process restarts (see
+    app.shopify_client._OAuthTokenProvider).
+    """
+
+    __tablename__ = "shopify_oauth_credentials"
+
+    store_id = db.Column(db.String(64), primary_key=True)
+    shop_domain = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    encrypted_access_token = db.Column(db.LargeBinary, nullable=False)
+    encrypted_refresh_token = db.Column(db.LargeBinary, nullable=False)
+    scope = db.Column(db.String(255), nullable=False)
+    access_token_expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    refresh_token_expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    # Set when a refresh attempt comes back 401 (refresh token dead —
+    # expired, revoked, or the app was uninstalled and reinstalled without
+    # us noticing) — the token provider stops retrying in a loop and the
+    # store needs the client to click a fresh install link. Never cleared
+    # automatically; a successful fresh install's callback overwrites this
+    # whole row anyway.
+    needs_reauth = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)

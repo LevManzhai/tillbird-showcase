@@ -1,0 +1,49 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        # Baked into the image so a fresh build already matches your
+        # deploy user — Compose reads these from .env automatically (the
+        # same file env_file: below loads into the running container),
+        # so set APP_UID/APP_GID there, not here. See Dockerfile and
+        # docker-entrypoint.sh for why this matters: without it, every
+        # file the app writes into instance/stores/data ends up
+        # root-owned on the host.
+        APP_UID: "${APP_UID:-1000}"
+        APP_GID: "${APP_GID:-1000}"
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./instance:/app/instance
+      - ./stores:/app/stores
+      # data/ holds runtime CSV output; bind-mounted like instance/ and stores/.
+      - ./data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "autoheal=true"
+
+  # Plain `restart: unless-stopped` only restarts a container that has
+  # crashed — it does nothing if the process is still running but /health is
+  # failing (e.g. DB file corrupted, deadlocked). autoheal watches containers
+  # labelled above and restarts them if Docker reports them "unhealthy".
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
